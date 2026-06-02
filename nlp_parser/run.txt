@@ -1,0 +1,1 @@
+venv/bin/python3 -m nlp_parser.run_pipeline "SSpawn the player in the bottom left corner. Build a high platform by placing two enemies in the top right, and hide a piece of loot in the middle center"

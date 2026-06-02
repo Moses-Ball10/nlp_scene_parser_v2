@@ -1,0 +1,8 @@
+# Core ML / inference stack
+torch
+transformers
+pyspellchecker
+numpy
+
+# Optional but commonly pulled in by transformers models/tokenizers
+safetensors

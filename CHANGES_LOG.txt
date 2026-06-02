@@ -1,0 +1,240 @@
+================================================================================
+                    SPRITESTACK + NLP PARSER — FULL CHANGES LOG
+                              Date: 2026-06-02
+================================================================================
+
+
+================================================================================
+PHASE 1: 16×16 GRID RENDERING & PIXEL-PERFECT ALIGNMENT
+================================================================================
+
+FILE: spritestack/app/sandbox_stage.py
+─────────────────────────────────────────
+1. set_scene() — Changed default object width/height from 0.12 to 0.0625
+   (1/16th of the stage), so each AI-generated block maps exactly to one
+   grid cell.
+
+2. _draw_board() — Replaced hardcoded 48px chessboard tiles with a dynamic
+   16×16 grid that scales to the widget size. Each cell is computed as
+   (widget_width / 16) × (widget_height / 16).
+
+3. _object_rect() — Rewrote to snap objects to exact grid cell boundaries.
+   Objects are aligned by computing column/row from normalized coordinates
+   and converting to pixel positions using the tile dimensions. Eliminates
+   sub-pixel gaps between adjacent blocks.
+
+4. mouseMoveEvent() — Added grid snapping for drag operations. When the user
+   drags an object, it snaps to the nearest 16×16 grid cell instead of
+   free-floating.
+
+5. _object_color() — Added name-based color mapping for object types:
+     - Solid  → Brown   (#8B5A2B)
+     - Loot   → Gold    (#FFD700)
+     - Enemy  → Red     (#FF4500)
+     - Climbable → Green (#32CD32)
+     - Player → Blue    (#1E90FF)
+
+FILE: spritestack/app/main_window.py
+─────────────────────────────────────────
+6. _sync_sandbox_stage_from_active_scene() — Changed default stage object
+   size from `0.12 * scale` to `0.0625 * scale` to match the 16×16 grid
+   cell dimensions.
+
+
+================================================================================
+PHASE 2: PREVIEW MAP — REMOVING GAPS & MATCHING COLORS
+================================================================================
+
+FILE: spritestack/app/sandbox_stage.py
+─────────────────────────────────────────
+7. _draw_preview_object() — Removed all inner margins/padding:
+     - Changed `rect.adjusted(3, 3, -3, -3)` to just `rect`
+     - Changed Qt.KeepAspectRatio to Qt.IgnoreAspectRatio so the sprite
+       fills the entire cell
+     - Removed centering offset calculations
+     - Changed fallback fillRect from `rect.adjusted(4, 4, -4, -4)` to `rect`
+
+FILE: spritestack/app/main_window.py
+─────────────────────────────────────────
+8. _ensure_ai_object() — Changed placeholder image colors from MD5 hash-based
+   random colors to the same type-specific color scheme (Solid=Brown,
+   Loot=Gold, Enemy=Red, Climbable=Green, Player=Blue). Changed margin
+   from `max(2, ph_w // 4)` to `0` so the color fills the full sprite canvas.
+
+
+================================================================================
+PHASE 3: PLAYER PLACEMENT ON SOLID GROUND
+================================================================================
+
+FILE: spritestack-api/plugins/real_parse_scene.py
+─────────────────────────────────────────
+9. Added post-processing after Model B generates the grid:
+     - Checks if a player (cell value 5) exists anywhere in the 16×16 grid
+     - If no player exists, scans columns left-to-right, rows bottom-to-top
+     - Finds the first solid block (cell value 1) with air (cell value 0)
+       directly above it
+     - Places the player (value 5) in that air cell above the solid block
+     - This guarantees the player always spawns standing on ground
+
+
+================================================================================
+PHASE 4: NLP PARSER IMPROVEMENTS — SPELLCHECKER & NORMALIZATION
+================================================================================
+
+FILE: nlp_parser/nlp_parser/model_A/scripts/inference.py
+─────────────────────────────────────────
+10. Added game-specific words to the SpellChecker vocabulary to prevent
+    incorrect auto-corrections:
+      - Phase 4: 'loot', 'climbable', 'solid', 'platform', 'ladder'
+      - Phase 6: 'dungeon', 'desert', 'grassland', 'castle', 'jungle',
+                 'forest', 'cave'
+    
+    PROBLEM FIXED: The spellchecker was corrupting "loot" into "lo-ot",
+    which caused all loot items to be misclassified as enemies.
+
+FILE: nlp_parser/nlp_parser/shared/scene_format.py
+─────────────────────────────────────────
+11. POSITION_TO_ZONE mapping — Expanded from 16 entries to 30+ entries.
+    Added support for common position synonyms:
+      - "left-side" → mid-left
+      - "right-side" → mid-right
+      - "middle-left", "middle-right", "middle-center" → proper zones
+      - "bottom", "bottom-floor", "floor", "ground" → bot-center
+      - Corner variants like "top-left-corner", "bottom-right-corner"
+
+12. Category classification — Replaced exact-match dictionary lookup with
+    substring matching logic:
+      - "player" or "hero" in name → category "player"
+      - "loot", "coin", "gem", "treasure", "chest", "item", "lo-ot" → "loot"
+      - "enemy", "skeleton", "monster", "dragon", "guard" → "enemy"
+      - Everything else → "other" (instead of defaulting to "enemy")
+    
+    PROBLEM FIXED: Structural objects like "solid-floor", "platform",
+    "ladder" were all defaulting to "enemy" category, injecting false
+    counts into the Model B blueprint conditioning vector. Now they
+    classify as "other" and are correctly excluded.
+
+13. Zone matching — Changed from exact dictionary lookup to substring
+    matching (iterates POSITION_TO_ZONE and checks if key is contained
+    in the position string). This handles compound positions like
+    "middle---left" or "bottom-floor" that the NER model sometimes
+    produces with extra hyphens.
+
+
+================================================================================
+PHASE 5: SCENE_TYPE / THEME PASS-THROUGH
+================================================================================
+
+FILE: spritestack/app/scene_model.py
+─────────────────────────────────────────
+14. parse_ai_scene_payload() — Added "scene_type" field to each parsed
+    placement dict, extracted from the raw API object's "scene_type" or
+    "theme" field (defaults to "default").
+
+FILE: spritestack/app/main_window.py
+─────────────────────────────────────────
+15. _sync_sandbox_stage_from_active_scene() — Added "scene_type" field
+    to each stage_objects dict entry, sourced from the object_layers
+    metadata. This passes the theme through to the sandbox stage renderer.
+
+
+================================================================================
+PHASE 6: VOXEL ART STYLE THEMES (DUNGEON, DESERT, GRASSLAND)
+================================================================================
+
+FILE: nlp_parser/nlp_parser/shared/scene_format.py
+─────────────────────────────────────────
+16. Added theme extraction at the end of normalize_scene_json():
+      - Scans raw_text for theme keywords
+      - "dungeon", "cave", "castle" → theme "dungeon"
+      - "desert", "sand" → theme "desert"
+      - "grassland", "jungle", "forest", "green" → theme "grassland"
+      - Sets scene_metadata.global_theme accordingly
+
+FILE: spritestack/app/main_window.py
+─────────────────────────────────────────
+17. _ensure_ai_object() — Complete rewrite with theme-aware logic:
+    
+    a) Object reuse: Instead of returning early when an object with the
+       same name exists, it now updates the object's scene_type and
+       regenerates its texture. This allows theme changes to apply to
+       existing objects.
+    
+    b) Theme-specific color palettes:
+       DUNGEON:
+         - Solid → Dark Slate Gray (#2F4F4F)
+         - Loot → Gold (#FFD700)
+         - Enemy → Dark Lava Red (#8B0000)
+         - Climbable → Dark Wood (#4A3B32)
+         - Player → Cyan (#00FFFF)
+       DESERT:
+         - Solid → Sandstone Tan (#D2B48C)
+         - Loot → Purple Gem (#9370DB)
+         - Enemy → Orange (#D35400)
+         - Climbable → Dry Wood (#CD853F)
+         - Player → Sky White-Blue (#E0FFFF)
+       GRASSLAND / DEFAULT:
+         - Solid → Brown Dirt (#8B5A2B)
+         - Loot → Gold (#FFD700)
+         - Enemy → Red (#FF4500)
+         - Climbable → Green (#32CD32)
+         - Player → Blue (#1E90FF)
+    
+    c) Procedural pixel textures drawn with QPainter:
+       SOLID blocks:
+         - Dungeon: Dark stone brick pattern with mortar joint grid lines
+         - Desert: Horizontal sandstone strata layers with alternating tones
+         - Grassland: Green grass top layer (16px) with blade marks, brown
+                      dirt body with scattered dirt speckle points
+       CLIMBABLE blocks:
+         - Vertical rail lines on left/right edges
+         - Horizontal rung lines every 12px
+         - Colors vary by theme (dark wood, dry wood, sea green)
+       LOOT blocks:
+         - Chest outline rectangle with dark brown border
+         - Gold lock/clasp square in the center
+       ENEMY blocks:
+         - Red "X" cross mark drawn diagonally
+       PLAYER blocks:
+         - Rounded capsule/visor outline with light fill
+
+FILE: spritestack/app/sandbox_stage.py
+─────────────────────────────────────────
+18. _draw_board() — Board background now adapts to the active theme:
+      - Detects theme from the first object that has a non-default scene_type
+      - DUNGEON: Very dark blue-black tiles (#1a1a24 / #14141e), dark grid
+      - DESERT: Warm dark brown tiles (#3d3020 / #342a1a), brown grid
+      - GRASSLAND: Dark green tiles (#1a2a1a / #162416), green grid
+      - DEFAULT: Original dark purple tiles (#222234 / #1a1a2a)
+
+19. _object_color() — Updated with full theme-aware color selection:
+      - Reads "scene_type" from each object dict
+      - Returns the matching theme palette color (same as _ensure_ai_object)
+      - Falls back to the default palette for unknown object names
+
+
+================================================================================
+SUMMARY OF ALL MODIFIED FILES
+================================================================================
+
+  nlp_parser/nlp_parser/model_A/scripts/inference.py
+    → Spellchecker vocabulary (game terms + theme keywords)
+
+  nlp_parser/nlp_parser/shared/scene_format.py
+    → Position-to-zone mapping, category classification, theme extraction
+
+  spritestack/app/sandbox_stage.py
+    → 16×16 grid rendering, grid snapping, preview map margins,
+      theme-aware board background, theme-aware object colors
+
+  spritestack/app/main_window.py
+    → Object size (0.0625), placeholder textures, procedural drawing,
+      theme color palettes, scene_type pass-through
+
+  spritestack/app/scene_model.py
+    → scene_type field in parse_ai_scene_payload
+
+  spritestack-api/plugins/real_parse_scene.py
+    → Player-on-solid post-processing logic
+
+================================================================================

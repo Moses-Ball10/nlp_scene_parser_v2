@@ -1,0 +1,31 @@
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large files & Model weights
+*.zip
+*.safetensors
+*.pth
+*.pt
+*.npy
+*.pdf
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.spec

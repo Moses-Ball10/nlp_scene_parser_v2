@@ -1,0 +1,85 @@
+================================================================================
+                    SPRITESTACK NLP SCENE GENERATOR — TEST PROMPTS
+================================================================================
+
+
+================================================================================
+DEFAULT THEME (no theme keyword)
+================================================================================
+
+1. Place a solid floor at the bottom. Spawn the player on the left and put loot on the right.
+
+2. Build a high platform in the center with two enemies on top. Spawn the player at the bottom left corner.
+
+3. Create a split floor with a gap in the middle. Spawn the player on the left side, and place a climbable ladder on the right side leading up to a loot item.
+
+4. Place a solid floor at the bottom. Build a platform on the middle-left with one enemy, and build another platform on the middle-right containing a piece of loot.
+
+5. Spawn the player on the bottom floor. Build a tall vertical ladder in the middle center leading up to a high platform. Place a chest of loot on the platform guarded by an enemy.
+
+6. Build three platforms at different heights. Place an enemy on the top platform, loot on the middle platform, and spawn the player on the bottom.
+
+
+================================================================================
+DUNGEON THEME
+================================================================================
+
+7. Build a dark dungeon with a solid floor and high walls. Place the player in the bottom left corner and hide loot in the top right guarded by two enemies.
+
+8. Create a dungeon with platforms at different heights. Place a climbable ladder in the center leading to a chest of loot at the top. Spawn an enemy on the middle platform.
+
+9. Build a castle level with a long solid floor. Place three enemies across the top and spawn the player on the left side with loot on the right.
+
+10. Design a cave with narrow platforms. Spawn the player at the bottom, place loot in the middle, and put an enemy at the top.
+
+
+================================================================================
+DESERT THEME
+================================================================================
+
+11. Create a desert level with sand platforms. Spawn the player on the bottom left and place loot on a high platform on the right.
+
+12. Build a sandy desert with a split floor and a gap in the middle. Place an enemy on the right side and spawn the player on the left.
+
+13. Place solid blocks at the bottom of a sunny desert. Put an enemy in the center and loot on the right, spawn the player on the left.
+
+14. Create a desert with three sand platforms stacked vertically. Place an enemy on each platform and spawn the player at the bottom.
+
+
+================================================================================
+GRASSLAND THEME
+================================================================================
+
+15. Create a grassland level with a solid floor. Spawn the player on the left and place loot in the center guarded by an enemy.
+
+16. Build a forest level with platforms at three different heights. Place loot on the top platform and spawn the player at the bottom left.
+
+17. Design a green jungle with a long solid floor and a high platform. Put two enemies on the platform and hide loot underneath. Spawn the player on the far left.
+
+18. Create a grassland with a split floor. Place a climbable ladder on the left side and loot on the right side, with an enemy guarding it.
+
+
+================================================================================
+STRESS TESTS (complex prompts)
+================================================================================
+
+19. Build a dungeon with five platforms at different heights. Place enemies on every platform, put loot on the top, and spawn the player at the very bottom left corner.
+
+20. Create a desert with a long floor, two gaps, and three enemies spread across. Place loot items on both sides and spawn the player in the center.
+
+21. Build a forest level with a solid floor, two high platforms on the left and right, a climbable ladder in the center, loot on the right platform, two enemies on the left platform, and spawn the player on the floor.
+
+
+================================================================================
+EDGE CASES
+================================================================================
+
+22. Spawn the player. (minimal prompt — should still place player on generated ground)
+
+23. Place one enemy in the center. (no player specified — player should auto-spawn on solid)
+
+24. Build an empty level. (should return empty/minimal layout)
+
+25. Place loot in every corner. Spawn the player in the center with enemies on the left and right.
+
+================================================================================
