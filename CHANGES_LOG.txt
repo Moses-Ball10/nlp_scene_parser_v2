@@ -232,9 +232,48 @@ SUMMARY OF ALL MODIFIED FILES
       theme color palettes, scene_type pass-through
 
   spritestack/app/scene_model.py
-    → scene_type field in parse_ai_scene_payload
+    → scene_type field in parse_ai_scene_payload, unique placement IDs,
+      removal methods
 
   spritestack-api/plugins/real_parse_scene.py
     → Player-on-solid post-processing logic
+
+================================================================================
+PHASE 7: UNIQUE PLACEMENT IDS & DELETION FIXES
+================================================================================
+
+FILE: spritestack/app/scene_model.py
+─────────────────────────────────────────
+1. ObjectPlacement — Added unique `id` generated via `uuid` to distinguish
+   independent placements of identical templates (like multiple solid blocks).
+2. Scene — Added `get_placement_by_id` and `remove_placement_by_id` methods.
+
+FILE: spritestack/app/main_window.py
+─────────────────────────────────────────
+3. _sync_sandbox_stage_from_active_scene() — Switched to storing unique
+   placement IDs in stage objects.
+4. _on_stage_object_moved() — Looks up and updates specific placements by their
+   unique ID instead of template ID.
+5. _delete_selected_placement() — Added method to delete specific placements.
+6. Delete Button — Added "Delete Selected" button to Sandbox sidebar.
+7. Keyboard Shortcut — Bound Delete/Backspace keys to trigger placement deletion.
+
+
+================================================================================
+PHASE 8: MULTI-SCENE HORIZONTALLY SCROLLING STAGE
+================================================================================
+
+FILE: spritestack/app/sandbox_stage.py
+─────────────────────────────────────────
+8. _num_screens — Added dynamic screen width multiplier.
+9. Grid Columns — Replaced hardcoded 16 columns with `16 * num_screens`.
+10. Dimensions — Added `update_stage_dimensions()` to size the stage.
+
+FILE: spritestack/app/main_window.py
+─────────────────────────────────────────
+11. QScrollArea — Wrapped SandboxStage in a scrollable panel.
+12. Screens QSpinBox — Added numeric selector on the sidebar to adjust width.
+13. resizeEvent() — Triggered size recalculation to keep tiles square.
+14. _sync_sandbox_stage_from_active_scene() — Scales object coordinates.
 
 ================================================================================

@@ -46,8 +46,24 @@ class SandboxStage(QWidget):
         self._preview_enabled = False
         self._sprite_pixmaps: dict[str, QPixmap] = {}
         self._palette = [ACCENT, GREEN, YELLOW, CYAN, RED]
+        self._num_screens = 1
         self.setMinimumSize(360, 260)
         self.setMouseTracking(True)
+
+    @property
+    def num_screens(self) -> int:
+        return self._num_screens
+
+    @num_screens.setter
+    def num_screens(self, val: int):
+        self._num_screens = max(1, int(val))
+        self.updateGeometry()
+        self.update()
+
+    def update_stage_dimensions(self, viewport_height: int):
+        h = max(260, viewport_height)
+        w = h * self._num_screens
+        self.setFixedSize(w, h)
 
     def set_scene(self, objects: list[dict]) -> None:
         normalised = []
@@ -137,8 +153,8 @@ class SandboxStage(QWidget):
         w = float(obj.get("w", 0.0625))
         h = float(obj.get("h", 0.0625))
         
-        # Calculate target position using snap to 16x16 grid
-        cols, rows = 16, 16
+        # Calculate target position using snap to grid
+        cols, rows = 16 * self._num_screens, 16
         tile_w = max(1.0, self.width() / cols)
         tile_h = max(1.0, self.height() / rows)
         
@@ -168,7 +184,7 @@ class SandboxStage(QWidget):
 
     def _draw_board(self, p: QPainter):
         p.fillRect(self.rect(), QColor(BG_DARK))
-        cols, rows = 16, 16
+        cols, rows = 16 * self._num_screens, 16
         tile_w = self.width() / cols
         tile_h = self.height() / rows
         
@@ -287,7 +303,7 @@ class SandboxStage(QWidget):
         p.drawText(rect, Qt.AlignCenter, mark)
 
     def _object_rect(self, obj: dict) -> QRect:
-        cols, rows = 16, 16
+        cols, rows = 16 * self._num_screens, 16
         tile_w = self.width() / cols
         tile_h = self.height() / rows
         

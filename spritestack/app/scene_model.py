@@ -496,6 +496,7 @@ class ObjectPlacement:
     def __init__(
         self,
         object_id: str,
+        placement_id: str | None = None,
         visible: bool = True,
         offset_x: float = 0.0,
         offset_y: float = 0.0,
@@ -504,6 +505,7 @@ class ObjectPlacement:
         rotation: float = 0.0,
         opacity: int = 255,
     ):
+        self.id: str = placement_id or f"pmt_{uuid.uuid4().hex[:8]}"
         self.object_id: str = object_id  # Reference to global object
         self.visible: bool = visible
         self.offset_x: float = offset_x
@@ -515,6 +517,7 @@ class ObjectPlacement:
 
     def to_dict(self) -> dict:
         return {
+            "id": self.id,
             "object_id": self.object_id,
             "visible": self.visible,
             "offset_x": self.offset_x,
@@ -529,6 +532,7 @@ class ObjectPlacement:
     def from_dict(cls, data: dict) -> "ObjectPlacement":
         return cls(
             object_id=data.get("object_id", ""),
+            placement_id=data.get("id"),
             visible=data.get("visible", True),
             offset_x=data.get("offset_x", 0.0),
             offset_y=data.get("offset_y", 0.0),
@@ -539,7 +543,7 @@ class ObjectPlacement:
         )
 
     def copy(self) -> "ObjectPlacement":
-        """Create a deep copy of this placement."""
+        """Create a deep copy of this placement with a new unique placement ID."""
         return ObjectPlacement(
             object_id=self.object_id,
             visible=self.visible,
@@ -593,10 +597,25 @@ class Scene:
         self.placements.pop(idx)
         return True
 
+    def remove_placement_by_id(self, placement_id: str) -> bool:
+        """Remove a placement by its unique ID."""
+        for idx, p in enumerate(self.placements):
+            if p.id == placement_id:
+                self.placements.pop(idx)
+                return True
+        return False
+
     def get_placement(self, object_id: str) -> Optional[ObjectPlacement]:
         """Get the placement for a specific object."""
         for p in self.placements:
             if p.object_id == object_id:
+                return p
+        return None
+
+    def get_placement_by_id(self, placement_id: str) -> Optional[ObjectPlacement]:
+        """Get the placement by its unique placement ID."""
+        for p in self.placements:
+            if p.id == placement_id:
                 return p
         return None
 

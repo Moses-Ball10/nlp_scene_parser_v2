@@ -74,7 +74,7 @@ from PyQt5.QtWidgets import (
     QMessageBox, QShortcut, QSizePolicy, QSpinBox, QSplitter, QStatusBar,
     QTabWidget, QToolBar, QVBoxLayout, QWidget, QFrame, QPushButton, QGridLayout,
     QStackedWidget, QListWidget, QListWidgetItem, QTreeWidget, QTreeWidgetItem,
-    QDoubleSpinBox, QPlainTextEdit,
+    QDoubleSpinBox, QPlainTextEdit, QScrollArea,
 )
 
 from app.canvas import PixelCanvas
@@ -1045,10 +1045,15 @@ class MainWindow(QMainWindow):
         center_split = QSplitter(Qt.Vertical)
         center_split.setChildrenCollapsible(False)
         center_split.setHandleWidth(8)
+        self.sandbox_scroll = QScrollArea()
+        self.sandbox_scroll.setWidgetResizable(False)
+        self.sandbox_scroll.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.sandbox_scroll.setStyleSheet(f"border: 0px; background: {_A['bg']};")
         self.sandbox_stage = SandboxStage()
         self.sandbox_stage.object_moved.connect(self._on_stage_object_moved)
         self.sandbox_stage.object_selected.connect(self._on_stage_object_selected)
-        center_split.addWidget(self.sandbox_stage)
+        self.sandbox_scroll.setWidget(self.sandbox_stage)
+        center_split.addWidget(self.sandbox_scroll)
 
         transform_strip = QWidget()
         transform_strip.setStyleSheet(f"background:{_A['bg_panel']};border-top:1px solid {_A['border_dark']};")
@@ -1116,12 +1121,29 @@ class MainWindow(QMainWindow):
         title = QLabel("Scene Objects")
         title.setStyleSheet(f"color:{_A['text_bright']};font-weight:bold;")
         rcol.addWidget(title)
+
+        screen_control_row = QHBoxLayout()
+        screen_label = QLabel("Level Width (Screens):")
+        screen_label.setStyleSheet(f"color:{_A['text']};")
+        self.screen_spin = QSpinBox()
+        self.screen_spin.setRange(1, 5)
+        self.screen_spin.setValue(1)
+        self.screen_spin.valueChanged.connect(self._on_screens_changed)
+        screen_control_row.addWidget(screen_label)
+        screen_control_row.addWidget(self.screen_spin)
+        rcol.addLayout(screen_control_row)
+
         self.sandbox_object_list = QListWidget()
         self.sandbox_object_list.itemClicked.connect(self._on_sandbox_object_item_clicked)
         rcol.addWidget(self.sandbox_object_list, 3)
+        btn_row = QHBoxLayout()
+        self.delete_btn = QPushButton("Delete Selected")
+        self.delete_btn.clicked.connect(self._delete_selected_placement)
+        btn_row.addWidget(self.delete_btn)
         clear_btn = QPushButton("Clear Scene")
         clear_btn.clicked.connect(self._clear_sandbox_scene)
-        rcol.addWidget(clear_btn)
+        btn_row.addWidget(clear_btn)
+        rcol.addLayout(btn_row)
 
         self.sandbox_chat = AIChatPanel()
         self.sandbox_chat.input_edit.setPlaceholderText("Ask about scene layouts or prompt tips…")
@@ -1336,6 +1358,7 @@ class MainWindow(QMainWindow):
         elif mode == "sandbox":
             self._mount_canvas_in_sandbox()
             self.workspace_stack.setCurrentIndex(1)
+            QTimer.singleShot(50, self._update_sandbox_stage_size)
         elif mode == "animate":
             self._mount_canvas_in_animate()
             self.workspace_stack.setCurrentIndex(2)
@@ -3299,10 +3322,11 @@ class MainWindow(QMainWindow):
     def _on_stage_object_moved(self, object_id: str, new_x: float, new_y: float):
         scene = self.scene_manager.get_active_scene() if self.scene_manager else None
         if scene:
-            placement = scene.get_placement(str(object_id or ""))
+            placement = scene.get_placement_by_id(str(object_id or "")) or scene.get_placement(str(object_id or ""))
             if placement:
-                obj_w = 0.12
-                obj_h = 0.12
+                num_sc = self.sandbox_stage.num_screens if hasattr(self, "sandbox_stage") else 1
+                obj_w = 0.0625 / num_sc
+                obj_h = 0.0625
                 if hasattr(self, "sandbox_stage"):
                     for obj in self.sandbox_stage.objects():
                         if str(obj.get("id", "")) == str(object_id or ""):
@@ -3334,6 +3358,7 @@ class MainWindow(QMainWindow):
             for o in getattr(self.canvas, "object_layers", [])
             if isinstance(o, dict) and o.get("id")
         }
+        num_screens = self.sandbox_stage.num_screens
         stage_objects = []
         for placement in scene.placements:
             meta = object_map.get(placement.object_id)
@@ -3342,14 +3367,16 @@ class MainWindow(QMainWindow):
             nx = max(0.0, min(1.0, 0.5 + placement.offset_x / max(1.0, float(self.canvas.canvas_width))))
             ny = max(0.0, min(1.0, 0.5 + placement.offset_y / max(1.0, float(self.canvas.canvas_height))))
             size = max(0.01, min(1.0, 0.0625 * float(placement.scale or 1.0)))
+            w_size = size / num_screens
             stage_objects.append({
-                "id": placement.object_id,
+                "id": placement.id,
+                "object_id": placement.object_id,
                 "label": meta.get("name", "Object"),
                 "name": meta.get("name", "Object"),
                 "type": meta.get("type", "stack"),
-                "x": max(0.0, min(1.0 - size, nx - size / 2.0)),
+                "x": max(0.0, min(1.0 - w_size, nx - w_size / 2.0)),
                 "y": max(0.0, min(1.0 - size, ny - size / 2.0)),
-                "w": size,
+                "w": w_size,
                 "h": size,
                 "visible": placement.visible,
                 "scene_type": meta.get("scene_type", "default"),
@@ -3365,12 +3392,13 @@ class MainWindow(QMainWindow):
         for obj in self.sandbox_stage.objects():
             if not isinstance(obj, dict):
                 continue
-            oid = str(obj.get("id") or "")
-            if not oid:
+            pid = str(obj.get("id") or "")
+            oid = str(obj.get("object_id") or "")
+            if not pid or not oid:
                 continue
             pixmap = self._sandbox_sprite_pixmap_for_object(oid)
             if pixmap and not pixmap.isNull():
-                images[oid] = pixmap
+                images[pid] = pixmap
         self.sandbox_stage.set_sprite_images(images)
 
     def _sandbox_sprite_pixmap_for_object(self, object_id: str) -> QPixmap | None:
@@ -3443,6 +3471,49 @@ class MainWindow(QMainWindow):
         self._active_object_id = None
         self._mark_modified()
         self._refresh_all()
+
+    def _delete_selected_placement(self):
+        if not hasattr(self, "sandbox_stage"):
+            return
+        selected_id = self.sandbox_stage._selected_id
+        if not selected_id:
+            if hasattr(self, "sandbox_object_list"):
+                item = self.sandbox_object_list.currentItem()
+                if item:
+                    selected_id = item.data(Qt.UserRole)
+        if not selected_id:
+            self.statusBar().showMessage("No scene object selected to delete.", 1600)
+            return
+
+        scene = self.scene_manager.get_active_scene() if self.scene_manager else None
+        if scene:
+            removed = scene.remove_placement_by_id(selected_id)
+            if not removed:
+                removed = scene.remove_object(selected_id)
+            if removed:
+                self.sandbox_stage._selected_id = ""
+                self._sync_sandbox_stage_from_active_scene()
+                self._mark_modified()
+                self._refresh_all()
+                self.statusBar().showMessage("Deleted selected object.", 1600)
+            else:
+                self.statusBar().showMessage("Failed to delete object placement.", 1600)
+
+    def _on_screens_changed(self, value: int):
+        if hasattr(self, "sandbox_stage"):
+            self.sandbox_stage.num_screens = value
+            self._update_sandbox_stage_size()
+            self._sync_sandbox_stage_from_active_scene()
+
+    def _update_sandbox_stage_size(self):
+        if not hasattr(self, "sandbox_scroll") or not hasattr(self, "sandbox_stage"):
+            return
+        h = self.sandbox_scroll.viewport().height()
+        self.sandbox_stage.update_stage_dimensions(h)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        QTimer.singleShot(50, self._update_sandbox_stage_size)
 
     def _toggle_scene_tips(self, checked: bool):
         self.scene_tips_toggle.setText(("▾" if checked else "▸") + " Scene Prompt Tips")
@@ -5674,6 +5745,11 @@ class MainWindow(QMainWindow):
         # Escape always deselects regardless of modifiers
         if key == Qt.Key_Escape:
             self.canvas.deselect()
+            return
+
+        # Delete or Backspace removes the selected placement in Sandbox workspace
+        if key in (Qt.Key_Delete, Qt.Key_Backspace) and getattr(self, "current_workspace", "create") == "sandbox":
+            self._delete_selected_placement()
             return
 
         # Fix 2: Space plays/pauses regardless of which widget has focus.
